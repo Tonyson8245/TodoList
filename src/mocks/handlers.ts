@@ -148,7 +148,7 @@ k   * POST /api/sign-in - 로그인
     if (body.email === "test401@test.com" && body.password === "test1234") {
       const tokens = {
         accessToken: "test401-token",
-        refreshToken: "test401-refresh-token",
+        refreshToken: "test401-expired-token", // 테스트 위해 유효하지 않은 refreshToken 설정
       };
       TOKEN_TO_EMAIL_MAP.set("test401-token", body.email);
       return HttpResponse.json(tokens, { status: 200 });
