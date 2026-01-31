@@ -6,23 +6,27 @@ import { signIn } from "../api/services";
 import type { SignInRequest, ErrorResponse } from "../types/api";
 
 function SignInPage() {
+  // 이메일, 비밀번호 상태 관리
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
+  // 로딩 상태, 에러 상태 관리
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const login = useAuthStore((state) => state.login);
-
   const navigate = useNavigate();
+
+  // redirect 파라미터 처리
   const [searchParams] = useSearchParams();
   const redirectPath = searchParams.get("redirect") || "/";
 
+  // 이메일, 비밀번호 유효성 검사
   const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   const isValidPassword = /^[a-zA-Z가-힣0-9]{8,24}$/.test(password);
-
   const isFormValid = isValidEmail && isValidPassword;
 
+  // 폼 제출 핸들러
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
