@@ -1,19 +1,24 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuthStore } from "../store/authStore";
 
 interface MainLayoutProps {
   children: React.ReactNode;
 }
 
 function MainLayout({ children }: MainLayoutProps) {
-  // TODO: 나중에 실제 로그인 로직 구현 예정
-  const isLoggedIn = false;
+  const isLoggedIn = useAuthStore((state) => state.isLoggedIn);
+  const logout = useAuthStore((state) => state.logout);
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    navigate("/sign-in");
+  };
 
   return (
     <div className="min-h-screen flex flex-col">
-      {/* GNB - 전역 네비게이션 */}
       <nav className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
-          {/* 왼쪽: 라우트 맵 */}
           <div className="flex items-center gap-6">
             <Link
               to="/"
@@ -29,7 +34,6 @@ function MainLayout({ children }: MainLayoutProps) {
             </Link>
           </div>
 
-          {/* 오른쪽: 로그인/회원정보 */}
           <div className="flex items-center gap-4">
             {isLoggedIn ? (
               <>
@@ -40,7 +44,7 @@ function MainLayout({ children }: MainLayoutProps) {
                   👤 회원정보
                 </Link>
                 <button
-                  onClick={() => {}}
+                  onClick={handleLogout}
                   className="flex items-center gap-2 text-gray-700 hover:text-blue-600"
                 >
                   🚪 로그아웃
@@ -58,7 +62,6 @@ function MainLayout({ children }: MainLayoutProps) {
         </div>
       </nav>
 
-      {/* 페이지 콘텐츠 영역 */}
       <main className="flex-1">{children}</main>
     </div>
   );
