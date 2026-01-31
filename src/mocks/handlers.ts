@@ -1,27 +1,7 @@
 import { http, HttpResponse } from "msw";
 
-/**
- * 쿼리 파라미터로 mockError 확인
- * 예: ?mockError=401 → 401 응답 반환
- */
-const checkMockError = (request: Request) => {
-  const url = new URL(request.url);
-  const mockError = url.searchParams.get("mockError");
-
-  if (mockError) {
-    const status = parseInt(mockError);
-    return HttpResponse.json(
-      { errorMessage: `Mock Error ${status}` },
-      { status },
-    );
-  }
-
-  return null;
-};
-
 // 가짜 사용자 데이터
 const MOCK_USER = {
-  id: "user-1",
   email: "test@test.com",
   password: "test1234",
   name: "홍길동",
@@ -35,23 +15,81 @@ const MOCK_TOKENS = {
 };
 
 // 유효한 accessToken 목록 (로그인 시 발급된 토큰들)
-const VALID_ACCESS_TOKENS = ["mock-access-token", "mock-access-token-renewed"];
+const VALID_ACCESS_TOKENS = [
+  "mock-access-token",
+  "mock-access-token-renewed",
+  "test400-token",
+  "test401-token",
+  "test404-token",
+];
 
 // 유효한 refreshToken 목록
 const VALID_REFRESH_TOKENS = [
   "mock-refresh-token",
   "mock-refresh-token-renewed",
+  "test400-refresh-token",
+  "test401-refresh-token",
+  "test404-refresh-token",
 ];
 
-// 테스트용 특수 이메일 패턴
+// 테스트용 특수 이메일 패턴 (로그인 단계에서 에러 발생)
 const TEST_ERROR_EMAILS: { [key: string]: number } = {
   "error400@test.com": 400,
-  "error401@test.com": 401,
   "error500@test.com": 500,
 };
 
-// 테스트용 특수 토큰 (항상 401 반환)
-const EXPIRED_TOKEN = "expired-token";
+// 현재 로그인한 사용자의 이메일을 저장 (토큰 -> 이메일 매핑)
+const TOKEN_TO_EMAIL_MAP = new Map<string, string>();
+
+// 테스트 계정별 에러 설정
+const getTestAccountError = (email: string | undefined, endpoint: string) => {
+  if (!email) return null;
+
+  const errorMap: Record<
+    string,
+    Record<string, { status: number; message: string }>
+  > = {
+    "test400@test.com": {
+      "/api/task": { status: 400, message: "잘못된 요청입니다." },
+    },
+    "test401@test.com": {
+      "/api/task": { status: 401, message: "인증이 만료되었습니다." },
+      "/api/task/:id": { status: 401, message: "인증이 만료되었습니다." },
+      "/api/user": { status: 401, message: "인증이 만료되었습니다." },
+    },
+    "test404@test.com": {
+      "/api/task": { status: 404, message: "할 일 목록을 찾을 수 없습니다." },
+      "/api/task/:id": { status: 404, message: "할 일을 찾을 수 없습니다." },
+    },
+  };
+
+  const accountErrors = errorMap[email];
+  if (!accountErrors) return null;
+
+  // 정확한 매칭
+  if (accountErrors[endpoint]) {
+    const errorConfig = accountErrors[endpoint];
+    return HttpResponse.json(
+      { errorMessage: errorConfig.message },
+      { status: errorConfig.status },
+    );
+  }
+
+  // :id 패턴 매칭 (예: /api/task/task-1 → /api/task/:id)
+  const patternMatch = Object.entries(accountErrors).find(
+    ([key]) => key.includes(":id") && endpoint.startsWith(key.split(":")[0]),
+  );
+
+  if (patternMatch) {
+    const errorConfig = patternMatch[1];
+    return HttpResponse.json(
+      { errorMessage: errorConfig.message },
+      { status: errorConfig.status },
+    );
+  }
+
+  return null;
+};
 
 const isValidToken = (authHeader: string | null): boolean => {
   if (!authHeader) {
@@ -65,11 +103,6 @@ const isValidToken = (authHeader: string | null): boolean => {
 
   // 토큰 추출
   const token = authHeader.replace("Bearer ", "");
-
-  // 테스트용 만료 토큰 체크
-  if (token === EXPIRED_TOKEN) {
-    return false;
-  }
 
   // 유효한 토큰 목록에 있는지 확인
   return VALID_ACCESS_TOKENS.includes(token);
@@ -90,9 +123,6 @@ export const handlers = [
 k   * POST /api/sign-in - 로그인
    */
   http.post("/api/sign-in", async ({ request }) => {
-    const mockErrorResponse = checkMockError(request);
-    if (mockErrorResponse) return mockErrorResponse;
-
     const body = (await request.json()) as { email: string; password: string };
 
     // 특수 이메일 패턴 체크 (테스트용)
@@ -104,10 +134,41 @@ k   * POST /api/sign-in - 로그인
       );
     }
 
+    // test400@test.com 계정 처리
+    if (body.email === "test400@test.com" && body.password === "test1234") {
+      const tokens = {
+        accessToken: "test400-token",
+        refreshToken: "test400-refresh-token",
+      };
+      TOKEN_TO_EMAIL_MAP.set("test400-token", body.email);
+      return HttpResponse.json(tokens, { status: 200 });
+    }
+
+    // test401@test.com 계정 처리
+    if (body.email === "test401@test.com" && body.password === "test1234") {
+      const tokens = {
+        accessToken: "test401-token",
+        refreshToken: "test401-refresh-token",
+      };
+      TOKEN_TO_EMAIL_MAP.set("test401-token", body.email);
+      return HttpResponse.json(tokens, { status: 200 });
+    }
+
+    // test404@test.com 계정 처리
+    if (body.email === "test404@test.com" && body.password === "test1234") {
+      const tokens = {
+        accessToken: "test404-token",
+        refreshToken: "test404-refresh-token",
+      };
+      TOKEN_TO_EMAIL_MAP.set("test404-token", body.email);
+      return HttpResponse.json(tokens, { status: 200 });
+    }
+
     if (
       body.email === MOCK_USER.email &&
       body.password === MOCK_USER.password
     ) {
+      TOKEN_TO_EMAIL_MAP.set(MOCK_TOKENS.accessToken, body.email);
       return HttpResponse.json(MOCK_TOKENS, { status: 200 });
     }
 
@@ -121,14 +182,17 @@ k   * POST /api/sign-in - 로그인
    * GET /api/user - 회원정보
    */
   http.get("/api/user", ({ request }) => {
-    const mockErrorResponse = checkMockError(request);
-    if (mockErrorResponse) return mockErrorResponse;
-
     const authHeader = request.headers.get("authorization");
 
     if (!isValidToken(authHeader)) {
       return unauthorizedResponse();
     }
+
+    const token = authHeader?.replace("Bearer ", "") || "";
+    const email = TOKEN_TO_EMAIL_MAP.get(token);
+
+    const testError = getTestAccountError(email, "/api/user");
+    if (testError) return testError;
 
     return HttpResponse.json({
       name: MOCK_USER.name,
@@ -140,9 +204,6 @@ k   * POST /api/sign-in - 로그인
    * GET /api/dashboard - 대시보드 통계
    */
   http.get("/api/dashboard", ({ request }) => {
-    const mockErrorResponse = checkMockError(request);
-    if (mockErrorResponse) return mockErrorResponse;
-
     const authHeader = request.headers.get("authorization");
 
     if (!isValidToken(authHeader)) {
@@ -160,14 +221,17 @@ k   * POST /api/sign-in - 로그인
    * GET /api/task - 할일 목록 (페이지네이션 지원)
    */
   http.get("/api/task", ({ request }) => {
-    const mockErrorResponse = checkMockError(request);
-    if (mockErrorResponse) return mockErrorResponse;
-
     const authHeader = request.headers.get("authorization");
 
     if (!isValidToken(authHeader)) {
       return unauthorizedResponse();
     }
+
+    const token = authHeader?.replace("Bearer ", "") || "";
+    const email = TOKEN_TO_EMAIL_MAP.get(token);
+
+    const testError = getTestAccountError(email, "/api/task");
+    if (testError) return testError;
 
     const url = new URL(request.url);
     const page = parseInt(url.searchParams.get("page") || "1");
@@ -200,14 +264,18 @@ k   * POST /api/sign-in - 로그인
    * GET /api/task/:id - 할일 상세
    */
   http.get("/api/task/:id", ({ params, request }) => {
-    const mockErrorResponse = checkMockError(request);
-    if (mockErrorResponse) return mockErrorResponse;
-
     const authHeader = request.headers.get("authorization");
 
     if (!isValidToken(authHeader)) {
       return unauthorizedResponse();
     }
+
+    const token = authHeader?.replace("Bearer ", "") || "";
+    const email = TOKEN_TO_EMAIL_MAP.get(token);
+
+    const url = new URL(request.url);
+    const testError = getTestAccountError(email, url.pathname);
+    if (testError) return testError;
 
     const { id } = params;
 
