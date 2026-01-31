@@ -38,54 +38,49 @@ const TEST_ERROR_EMAILS: { [key: string]: number } = {
   "error500@test.com": 500,
 };
 
-// 현재 로그인한 사용자의 이메일을 저장 (토큰 -> 이메일 매핑)
-const TOKEN_TO_EMAIL_MAP = new Map<string, string>();
-
-// 테스트 계정별 에러 설정
-const getTestAccountError = (email: string | undefined, endpoint: string) => {
-  if (!email) return null;
+// 토큰별 에러 설정
+const getTestTokenError = (token: string | undefined, endpoint: string) => {
+  if (!token) return null;
 
   const errorMap: Record<
     string,
     Record<string, { status: number; message: string }>
   > = {
-    "test400@test.com": {
+    "test400-token": {
       "/api/task": { status: 400, message: "잘못된 요청입니다." },
     },
-    "test401@test.com": {
+    "test401-token": {
       "/api/task": { status: 401, message: "인증이 만료되었습니다." },
       "/api/task/:id": { status: 401, message: "인증이 만료되었습니다." },
       "/api/user": { status: 401, message: "인증이 만료되었습니다." },
     },
-    "test404@test.com": {
+    "test404-token": {
       "/api/task": { status: 404, message: "할 일 목록을 찾을 수 없습니다." },
       "/api/task/:id": { status: 404, message: "할 일을 찾을 수 없습니다." },
     },
   };
 
-  const accountErrors = errorMap[email];
-  if (!accountErrors) return null;
+  const tokenErrors = errorMap[token];
+  if (!tokenErrors) return null;
 
   // 정확한 매칭
-  if (accountErrors[endpoint]) {
-    const errorConfig = accountErrors[endpoint];
+  if (tokenErrors[endpoint]) {
+    const errorConfig = tokenErrors[endpoint];
     return HttpResponse.json(
       { errorMessage: errorConfig.message },
       { status: errorConfig.status },
     );
   }
 
-  // :id 패턴 매칭 (예: /api/task/task-1 → /api/task/:id)
-  const patternMatch = Object.entries(accountErrors).find(
-    ([key]) => key.includes(":id") && endpoint.startsWith(key.split(":")[0]),
-  );
-
-  if (patternMatch) {
-    const errorConfig = patternMatch[1];
-    return HttpResponse.json(
-      { errorMessage: errorConfig.message },
-      { status: errorConfig.status },
-    );
+  // /api/task/로 시작하고 /api/task 자체가 아니면 :id 패턴으로 간주
+  if (endpoint.startsWith("/api/task/") && endpoint !== "/api/task") {
+    if (tokenErrors["/api/task/:id"]) {
+      const errorConfig = tokenErrors["/api/task/:id"];
+      return HttpResponse.json(
+        { errorMessage: errorConfig.message },
+        { status: errorConfig.status },
+      );
+    }
   }
 
   return null;
@@ -140,7 +135,6 @@ k   * POST /api/sign-in - 로그인
         accessToken: "test400-token",
         refreshToken: "test400-refresh-token",
       };
-      TOKEN_TO_EMAIL_MAP.set("test400-token", body.email);
       return HttpResponse.json(tokens, { status: 200 });
     }
 
@@ -148,9 +142,8 @@ k   * POST /api/sign-in - 로그인
     if (body.email === "test401@test.com" && body.password === "test1234") {
       const tokens = {
         accessToken: "test401-token",
-        refreshToken: "test401-expired-token", // 테스트 위해 유효하지 않은 refreshToken 설정
+        refreshToken: "test401-refresh-token",
       };
-      TOKEN_TO_EMAIL_MAP.set("test401-token", body.email);
       return HttpResponse.json(tokens, { status: 200 });
     }
 
@@ -160,7 +153,6 @@ k   * POST /api/sign-in - 로그인
         accessToken: "test404-token",
         refreshToken: "test404-refresh-token",
       };
-      TOKEN_TO_EMAIL_MAP.set("test404-token", body.email);
       return HttpResponse.json(tokens, { status: 200 });
     }
 
@@ -168,7 +160,6 @@ k   * POST /api/sign-in - 로그인
       body.email === MOCK_USER.email &&
       body.password === MOCK_USER.password
     ) {
-      TOKEN_TO_EMAIL_MAP.set(MOCK_TOKENS.accessToken, body.email);
       return HttpResponse.json(MOCK_TOKENS, { status: 200 });
     }
 
@@ -189,9 +180,8 @@ k   * POST /api/sign-in - 로그인
     }
 
     const token = authHeader?.replace("Bearer ", "") || "";
-    const email = TOKEN_TO_EMAIL_MAP.get(token);
 
-    const testError = getTestAccountError(email, "/api/user");
+    const testError = getTestTokenError(token, "/api/user");
     if (testError) return testError;
 
     return HttpResponse.json({
@@ -228,9 +218,8 @@ k   * POST /api/sign-in - 로그인
     }
 
     const token = authHeader?.replace("Bearer ", "") || "";
-    const email = TOKEN_TO_EMAIL_MAP.get(token);
 
-    const testError = getTestAccountError(email, "/api/task");
+    const testError = getTestTokenError(token, "/api/task");
     if (testError) return testError;
 
     const url = new URL(request.url);
@@ -271,10 +260,9 @@ k   * POST /api/sign-in - 로그인
     }
 
     const token = authHeader?.replace("Bearer ", "") || "";
-    const email = TOKEN_TO_EMAIL_MAP.get(token);
 
     const url = new URL(request.url);
-    const testError = getTestAccountError(email, url.pathname);
+    const testError = getTestTokenError(token, url.pathname);
     if (testError) return testError;
 
     const { id } = params;
@@ -331,7 +319,7 @@ k   * POST /api/sign-in - 로그인
 
     if (VALID_REFRESH_TOKENS.includes(token)) {
       return HttpResponse.json({
-        accessToken: "mock-access-token-renewed",
+        accessToken: token,
         refreshToken: "mock-refresh-token-renewed",
       });
     }
