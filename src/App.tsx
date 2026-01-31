@@ -1,35 +1,52 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { createBrowserRouter, Outlet, RouterProvider } from "react-router-dom";
+import DashboardPage from "./pages/DashboardPage";
+import SignInPage from "./pages/SignInPage";
+import MainLayout from "./layouts/MainLayout";
+import TaskListPage from "./pages/TaskListPage";
+import TaskDetailPage from "./pages/TaskDetailPage";
+import UserProfilePage from "./pages/UserProfilePage";
 
-function App() {
-  const [count, setCount] = useState(0)
-
+function LayoutWrapper() {
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    <MainLayout>
+      <Outlet /> {/* Vue의 <router-view /> */}
+    </MainLayout>
+  );
 }
 
-export default App
+/**
+ * 라우터 설정 (라우트 가드 제거)
+ */
+const router = createBrowserRouter([
+  {
+    element: <LayoutWrapper />,
+    children: [
+      {
+        path: "/",
+        element: <DashboardPage />,
+      },
+      {
+        path: "/sign-in",
+        element: <SignInPage />,
+      },
+      {
+        path: "/task",
+        element: <TaskListPage />,
+      },
+      {
+        path: "/task/:id",
+        element: <TaskDetailPage />,
+      },
+      {
+        path: "/profile",
+        element: <UserProfilePage />,
+      },
+    ],
+  },
+]);
+
+function App() {
+  return <RouterProvider router={router} />;
+}
+
+export default App;
