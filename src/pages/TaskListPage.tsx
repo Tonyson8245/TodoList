@@ -126,34 +126,17 @@ function TaskListPage() {
     );
   }
 
-  // 에러
-  if (error) {
-    return (
-      <div className="bg-gray-50 p-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <p className="text-red-600">{error}</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="bg-gray-50 p-8">
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold text-gray-900 mb-6">
-          할 일 목록 (가상 스크롤링)
-        </h1>
+        <h1 className="text-3xl font-bold text-gray-900 mb-6">할 일 목록</h1>
 
-        {/* 할일이 없을 때 */}
         {tasks.length === 0 && !isLoading && (
           <div className="text-center py-12">
             <p className="text-gray-500">할 일이 없습니다.</p>
           </div>
         )}
 
-        {/* 가상 스크롤링 목록 */}
         {tasks.length > 0 && (
           <div ref={parentRef} className="h-[calc(100vh-200px)] overflow-auto">
             <div
@@ -214,7 +197,6 @@ function TaskListPage() {
                 );
               })}
             </div>
-            {/* 더 이상 데이터 없을 때 */}
             {!hasMore && tasks.length > 0 && (
               <div className="py-4 text-center">
                 <p className="text-gray-400">모든 할 일을 불러왔습니다.</p>
