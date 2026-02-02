@@ -13,6 +13,15 @@ React + TypeScript 기반 할 일 관리 애플리케이션
 - MSW 2.12
 - @tanstack/react-virtual 3.13
 
+## 💻 개발 환경
+
+- **IDE**: Cursor (Claude Sonnet 4.5)
+  - 코드 자동완성 및 보일러플레이트 작성
+  - Tailwind CSS 스타일링 지원
+  - 가상 스크롤링 등 기능 개발 보조
+- **런타임**: Node.js 20+
+- **패키지 매니저**: npm
+
 ## 🚀 시작하기
 
 ```bash
